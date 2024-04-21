@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>マルコフ連鎖...?</title>
+<style>
+body {
+	overflow-x:hidden;
+	overflow-y:scroll;
+	margin: 10px;;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+}
+#text {
+	width: 90%;
+	height: 20em;
+	border: solid 1px #ccc;
+	overflow-y:scroll;
+}
+.newtext {
+	color: #c030c0;
+}
+.oldtext {
+	color: #ab8b88;
+}
+.plytext {
+	color: black;
+}
+details {
+	border: solid #32a1ce;
+	padding-left: 4px;
+	margin-bottom: 6px;
+	width: 90%
+}
+h4 {
+	margin-bottom: 6px;
+}
+input[type="number"] {
+	width: 60px;
+}
+.opt_su {
+	background: #efefef;
+}
+</style>
+<script type="text/javascript">
+var worker = new Worker('MarkovWorker.js');
+var opCou = 0;
+var doIndex = 0,
+	doMaxIndex = 0,
+	doHistory = [];
+var oldtext = "",
+	oldtmp = "";
+
+function $(id){return document.getElementById(id)}
+
+window.onload = function(){
+	new_opts();
+}
+
+worker.addEventListener('message', function(e) {
+	switch(e.data[0]){
+		case "":
+			break;
+		case "createEnd":
+			doHistory[++doIndex] = $("text").innerHTML;
+			doMaxIndex = doIndex;
+		case "startupEnd":
+			$("start").disabled = false;
+			if(doMaxIndex > doIndex){
+				$("redo").disabled = false;
+			}
+			if(0 < doIndex){
+				$("undo").disabled = false;
+			}
+			break;
+		default:
+			let tmp = oldtmp
+				+ '<span class="newtext">'
+				+ e.data[0].slice(oldtext.length)
+				+ '</span>';
+			tmp += '<span class="plytext"><br></span>';
+			tmp = tmp.replace(/\?/g, "？")
+				.replace(/\!/g, "！")
+				.replace(/。/g, "。<br>")
+				.replace(/？/g, "？<br>")
+				.replace(/！/g, "！<br>");
+			for(let i=0;i<10;i++){
+				tmp = tmp.replace(/。<br>。/g, "。。")
+					.replace(/？<br>？/g, "？？")
+					.replace(/！<br>！/g, "！！")
+					.replace(/！<br>？/g, "！？")
+					.replace(/？<br>！/g, "？！")
+					.replace(/？<br>。/g, "？")
+					.replace(/！<br>。/g, "！")
+					.replace(/？<br>、/g, "？、")
+					.replace(/！<br>、/g, "！、");
+			}
+			tmp = tmp.replace(/。<br>」/g, "。」<br>")
+				.replace(/？<br>」/g, "？」<br>")
+				.replace(/！<br>」/g, "！」<br>")
+				.replace(/。<br>』/g, "。』<br>")
+				.replace(/？<br>』/g, "？』<br>")
+				.replace(/！<br>』/g, "！』<br>")
+				.replace(/？<br>）/g, "？）");
+			for(let i=0;i<10;i++){
+				tmp = tmp.replace(/」<br>」/g, "」」<br>")
+					.replace(/」<br>』/g, "」』<br>")
+					.replace(/』<br>』/g, "』』<br>")
+					.replace(/』<br>」/g, "』」<br>");
+			}
+			tmp = tmp.replace(/」「/g, "」<br>「")
+				.replace(/」『/g, "」<br>『")
+				.replace(/』「/g, "』<br>「")
+				.replace(/』『/g, "』<br>『");
+			$("text").innerHTML = tmp;
+			if(tmp.substr(-11,4)=="<br>"){
+				$("text").scrollTo(0, $("text").scrollHeight);
+			}
+	}
+	if(e.data[1] != ""){
+		$("logs").innerHTML = e.data[1];
+	}
+}, false);
+
+function generator() {
+	$("logs").innerHTML = "WebWorker接続中...";
+	$("start").disabled = true;
+	$("undo").disabled = true;
+	$("redo").disabled = true;
+	let oastr = [];
+	for(let i=0,j=1;i<opCou*2;i+=2,j++){
+		oastr[i] = $("ord"+j).value;
+		oastr[i+1] = $("ans"+j).value;
+	}
+	oldtext = $("text").textContent.replace(/\n/g,"");
+	if(doHistory.length == 0){
+		doHistory[0] = "";
+		doHistory[1] = $("text").innerHTML;
+		doIndex++;
+	}
+	oldtmp = $("text").innerHTML
+		.replace(/<br>/g,"")
+		.replace(/class=\"newtext\"/g,'class=oldtext');
+	worker.postMessage([
+		$("text").value = oldtext,
+		[
+			$("dmc").value,
+			$("par").checked,
+			$("gen").value,
+			$("ans").value,
+			$("enq").checked
+		],
+		[
+			$("noun").value,
+			$("verb").value,
+			$("part").value,
+			$("auxi").value,
+			$("adve").value,
+			$("adno").value,
+			$("symb").value,
+			$("inte").value,
+			$("conj").value,
+			$("adje").value,
+			$("pref").value
+		],
+		oastr
+	]);
+}
+
+function UnRedo(type){
+	let str = -1;
+	if(type > 0){
+		if(doMaxIndex > doIndex){
+			str = doHistory[++doIndex];
+			$("undo").disabled = false;
+			if(doMaxIndex <= doIndex){
+				$("redo").disabled = true;
+			}
+		}
+	}
+	else if(type < 0){
+		if(0 < doIndex){
+			str = doHistory[--doIndex];
+			$("redo").disabled = false;
+			if(0 >= doIndex){
+				$("undo").disabled = true;
+			}
+		}
+	}
+	if(str === -1){
+		return;
+	}
+	$("text").innerHTML = str;
+	$("text").scrollTo(0, $("text").scrollHeight);
+}
+
+function handlepaste(elem, e){
+	let str = e.clipboardData.getData("text/plain");
+	document.execCommand("insertHTML", false, str);
+}
+
+function new_opts(){
+	opCou++;
+	let op = $("opt_ma");
+	let elem = document.createElement("input");
+	elem = op.appendChild(elem);
+	elem.type = "text";
+	elem.id = "ord" + opCou;
+	elem = document.createElement("span");
+	elem = op.appendChild(elem);
+	elem.innerHTML = '置き換え前';
+	elem = document.createElement("input");
+	elem = op.appendChild(elem);
+	elem.type = "text";
+	elem.id = "ans" + opCou;
+	elem = document.createElement("span");
+	elem = op.appendChild(elem);
+	elem.innerHTML = '置き換え後' + opCou;
+	elem = document.createElement("br");
+	op.appendChild(elem);
+}
+
+</script>
+</head>
+<body>
+<form action="" onSubmit="generator();return false;">
+	<div id="text" contenteditable="true" onpaste="handlepaste(this, event);return false;"></div><br />
+	<input type="submit" value="文章生成" id="start" disabled/>
+	<input type="button" value="undo" id="undo" onClick="UnRedo(-1);" disabled/>
+	<input type="button" value="redo" id="redo" onClick="UnRedo(1);" disabled/>
+	<div id="logs">起動失敗</div>
+	<br/>
+</form>
+
+<details>
+	<summary>設定</summary>
+	<div class="opt_su">
+		<h4>
+			<input type="number" min="1" max="31" value="4" id="dmc" />
+			トークン同士の繋がりの強さ[DMC]
+		</h4>
+		<span>値が大きいほど日本語の違和感は減る<br/>
+			その代わりに文章の構成パターンも減る
+		</span>
+	</div>
+	<div class="opt_su">
+		<h4>
+			<input type="number" min="0" max="8191" value="0" id="gen" />
+			比較許容範囲[Generous]
+		</h4>
+		<span>値が大きいほどDMC、PartSpeechの信用度が減少する<br>
+			また、文章が崩壊しやすくなる
+		</span>
+	</div>
+	<div class="opt_su">
+		<h4>
+			<input type="number" min="0" max="4095" value="30" id="ans" />
+			生成最低文字数[ansLen]
+		</h4>
+		<span>文字数に達しなかった場合は途中から再生成される<br/>
+			再生成からは文末の1トークンが削除される
+		</span>
+	</div>
+	<div class="opt_su">
+		<h4>
+			<input type="checkbox" id="par" checked/>
+			品詞比較の使用[PartSpeech]
+		</h4>
+		<span>ON:品詞も文章構成に使用する<br/>
+			ONにする場合はDMCは少ない値にした方が無難
+		</span>
+	</div>
+	<div class="opt_su">
+		<h4>
+			<input type="checkbox" id="enq"/>
+			終わりを不明確に[endQuark]
+		</h4>
+		<span>ON:文章の最後をランダムに削る<br/>
+			ONにする場合ansLenを無視する可能性がある
+		</span>
+	</div>
+	<div>
+		<h4>注意点</h4>
+		<span>DMCが大きいと元の文章が出力されやすい</span>
+	</div>
+	<div class="opt_su">
+		<h4>
+			品詞置き換え[pos]
+		</h4>
+		<span>
+			<input type="text" id="noun" />名詞
+		</span>
+		<span>
+			<input type="text" id="adno" />連体詞
+		</span><br/>
+		<span>
+			<input type="text" id="verb" />動詞
+		</span>
+		<span>
+			<input type="text" id="inte" />感動詞
+		</span><br/>
+		<span>
+			<input type="text" id="part" />助詞
+		</span>
+		<span>
+			<input type="text" id="auxi" />助動詞
+		</span><br/>
+		<span>
+			<input type="text" id="adve" />副詞
+		</span>
+		<span>
+			<input type="text" id="conj" />接続詞
+		</span><br/>
+		<span>
+			<input type="text" id="symb" />記号
+		</span>
+		<span>
+			<input type="text" id="adje" />形容詞
+		</span><br/>
+		<span>
+			<input type="text" id="pref" />接頭詞
+		</span>
+	</div>
+	<div class="opt_su">
+		<h4>
+			単語置き換え[word]
+		</h4>
+		<div id="opt_ma">
+		</div>
+		<input type="button" onclick="new_opts();" value="追加" />
+	</div>
+</details>
+</body>

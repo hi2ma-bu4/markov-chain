@@ -1,0 +1,4 @@
+Option Explicit:Dim w,f,p,u,a,h,t,n,r:Set w=WScript.CreateObject("WScript.Shell"):Set f=createObject("Scripting.FileSystemObject"):p=f.getParentFolderName(WScript.ScriptFullName):n=Array("C:\Program Files","C:\Program Files (x86)"):r=Array("Google\Chrome\Application\chrome.exe","Microsoft\Edge\Application\msedge.exe","Opera\opera.exe","Disney Interactive Studios\Disney-Pixar Brave\Brave.exe"):u="":for each a in r:for each h in n:t=h&"\"&a:if f.FileExists(t) then u=t:exit for
+next:if not u="" then exit for
+next:if u="" then msgbox "申し訳ございません対応しているブラウザが存在しません"&vbCrLf&"対応ブラウザ:"&vbCrLf&"GoogleChrome, Edge, Opera, Brave",16,"Error":WScript.Quit
+w.Run """"&u&""" """&p&"\マルコフ連鎖.htm"" --allow-file-access-from-files"
